@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>数独游戏（包梓韩）</title>
+    <title>数独游戏</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -16,13 +16,38 @@
         h1 {
             color: #333;
         }
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px; /* Spacing between control elements */
+        }
+        .controls label {
+            font-size: 16px;
+        }
+        .controls select, .controls button {
+            padding: 8px 12px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        .controls button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            border-color: #007bff;
+        }
+        .controls button:hover {
+            background-color: #0056b3;
+        }
         #sudoku-board {
-            display: grid;
-            grid-template-columns: repeat(9, 40px);
-            grid-template-rows: repeat(9, 40px);
+            display: grid; /* Grid properties will be set by JS */
             border: 3px solid black;
             margin-bottom: 20px;
             box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            /* Prevent board from collapsing when empty */
+            min-width: 100px; 
+            min-height: 100px;
         }
         .sudoku-cell {
             width: 40px;
@@ -33,7 +58,6 @@
             border: 1px solid #ccc;
             box-sizing: border-box;
             color: #007bff;
-            /* Remove spinners from number input */
             -moz-appearance: textfield;
         }
         .sudoku-cell::-webkit-outer-spin-button,
@@ -45,34 +69,35 @@
             outline: none;
             background-color: #e6f7ff;
         }
-        button {
-            padding: 10px 15px; /* Adjusted padding for two buttons */
-            font-size: 16px;
-            cursor: pointer;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            transition: background-color 0.3s ease;
-            margin: 0 5px; /* Add some margin between buttons */
-        }
-        button:hover {
-            background-color: #0056b3;
+        .action-buttons button {
+             margin: 0 5px;
         }
         #message {
             margin-top: 15px;
             font-size: 18px;
             font-weight: bold;
-            min-height: 25px; /* Reserve space for message */
+            min-height: 25px;
         }
     </style>
 </head>
 <body>
-    <h1>数独游戏</h1>
+    <h1>数独游戏（包梓韩）</h1>
+
+    <div class="controls">
+        <label for="difficulty-select">选择难度:</label>
+        <select id="difficulty-select">
+            <option value="4x4">4x4 - 简单</option>
+            <option value="6x6">6x6 - 中等</option>
+            <option value="9x9" selected>9x9 - 困难</option>
+        </select>
+        <button id="start-game-button">开始新游戏</button>
+    </div>
+
     <div id="sudoku-board"></div>
-    <div>
-        <button id="check-button">检查答案</button>
-        <button id="hint-button">获取提示</button>
+
+    <div class="action-buttons">
+        <button id="check-button" disabled>检查答案</button>
+        <button id="hint-button" disabled>获取提示</button>
     </div>
     <p id="message"></p>
 
@@ -82,68 +107,87 @@
             const checkButton = document.getElementById('check-button');
             const hintButton = document.getElementById('hint-button');
             const messageElement = document.getElementById('message');
-            const N = 9;
+            const difficultySelect = document.getElementById('difficulty-select');
+            const startGameButton = document.getElementById('start-game-button');
+
+            const difficulties = {
+                '4x4': { size: 4, subgridRows: 2, subgridCols: 2, name: '4x4 - 简单' },
+                '6x6': { size: 6, subgridRows: 2, subgridCols: 3, name: '6x6 - 中等' }, // 6x6 subgrids are 2 rows, 3 cols
+                '9x9': { size: 9, subgridRows: 3, subgridCols: 3, name: '9x9 - 困难' }
+            };
+            let currentDifficultySettings = difficulties['9x9']; // Default
 
             function generateBoard() {
-                boardElement.innerHTML = ''; // Clear previous board if any
-                for (let i = 0; i < N; i++) {
-                    for (let j = 0; j < N; j++) {
+                boardElement.innerHTML = ''; // Clear previous board
+                messageElement.textContent = ''; // Clear message
+                const { size, subgridRows, subgridCols } = currentDifficultySettings;
+
+                boardElement.style.gridTemplateColumns = `repeat(${size}, 40px)`;
+                boardElement.style.gridTemplateRows = `repeat(${size}, 40px)`;
+
+                for (let i = 0; i < size; i++) {
+                    for (let j = 0; j < size; j++) {
                         const cell = document.createElement('input');
-                        cell.type = 'number'; // Use number type for basic validation
+                        cell.type = 'number';
                         cell.min = '1';
-                        cell.max = '9';
+                        cell.max = String(size); // Max input based on board size
                         cell.classList.add('sudoku-cell');
                         cell.dataset.row = i;
                         cell.dataset.col = j;
 
-                        // Add thicker borders for 3x3 subgrid divisions
-                        if ((i + 1) % 3 === 0 && i < N - 1) {
+                        if ((i + 1) % subgridRows === 0 && i < size - 1) {
                             cell.style.borderBottom = '2px solid black';
                         }
-                        if ((j + 1) % 3 === 0 && j < N - 1) {
+                        if ((j + 1) % subgridCols === 0 && j < size - 1) {
                             cell.style.borderRight = '2px solid black';
                         }
                         
-                        // Prevent typing more than one digit
                         cell.addEventListener('input', function() {
-                            if (this.value.length > 1) {
-                                this.value = this.value.slice(0, 1);
+                            if (this.value.length > String(size).length) { // Max length based on max number
+                                this.value = this.value.slice(0, String(size).length);
+                            }
+                            if (parseInt(this.value) > size) {
+                                this.value = String(size);
+                            }
+                            if (parseInt(this.value) < 1 && this.value !== '') {
+                                this.value = '1';
                             }
                         });
                         
-                        // Clear temporary background on focus
                         cell.addEventListener('focus', function() {
-                            if (this.style.backgroundColor === 'rgb(212, 237, 218)' || this.style.backgroundColor === 'rgb(255, 221, 221)') { // Corresponds to #d4edda and #ffdddd
-                                this.style.backgroundColor = '#e6f7ff'; // Standard focus color
+                            if (this.style.backgroundColor === 'rgb(212, 237, 218)' || this.style.backgroundColor === 'rgb(255, 221, 221)') {
+                                this.style.backgroundColor = '#e6f7ff';
                             }
                         });
-                        cell.addEventListener('blur', function() { // Reset background if focus is lost and it was a temp color
-                             if (this.style.backgroundColor === 'rgb(222, 243, 255)') { // #e6f7ff, standard focus
+                        cell.addEventListener('blur', function() {
+                             if (this.style.backgroundColor === 'rgb(222, 243, 255)') { 
                                 this.style.backgroundColor = '';
                              }
                         });
-
-
                         boardElement.appendChild(cell);
                     }
                 }
+                checkButton.disabled = false;
+                hintButton.disabled = false;
             }
 
             function getBoardState() {
+                const { size } = currentDifficultySettings;
                 const board = [];
                 const cells = boardElement.querySelectorAll('.sudoku-cell');
                 let k = 0;
-                for (let i = 0; i < N; i++) {
+                for (let i = 0; i < size; i++) {
                     board[i] = [];
-                    for (let j = 0; j < N; j++) {
+                    for (let j = 0; j < size; j++) {
                         const cellInput = cells[k++];
                         const val = cellInput.value;
-                        board[i][j] = val === '' ? 0 : parseInt(val);
-                        // Visually mark invalid numbers (not 1-9) temporarily
-                        if (val !== '' && (isNaN(parseInt(val)) || parseInt(val) < 1 || parseInt(val) > 9)) {
-                            cellInput.style.backgroundColor = '#ffdddd'; // Light red for invalid entry
-                        } else if (cellInput.style.backgroundColor === 'rgb(255, 221, 221)') { // If it was red, reset it
-                            cellInput.style.backgroundColor = ''; // Reset background
+                        const numVal = parseInt(val);
+                        board[i][j] = val === '' ? 0 : numVal;
+                        
+                        if (val !== '' && (isNaN(numVal) || numVal < 1 || numVal > size)) {
+                            cellInput.style.backgroundColor = '#ffdddd';
+                        } else if (cellInput.style.backgroundColor === 'rgb(255, 221, 221)') {
+                            cellInput.style.backgroundColor = '';
                         }
                     }
                 }
@@ -151,14 +195,15 @@
             }
 
             function isValidSet(arr) {
+                const { size } = currentDifficultySettings;
                 const seen = new Set();
                 for (const num of arr) {
-                    if (num === 0) continue; // Ignore empty cells (0)
-                    if (isNaN(num) || num < 1 || num > 9) { // Check for NaN and out of range
+                    if (num === 0) continue;
+                    if (isNaN(num) || num < 1 || num > size) {
                         return false; 
                     }
                     if (seen.has(num)) {
-                        return false; // Duplicate
+                        return false;
                     }
                     seen.add(num);
                 }
@@ -166,42 +211,35 @@
             }
 
             function isValidPlacement(board, row, col, num) {
-                // 检查行
-                for (let c = 0; c < N; c++) {
-                    if (board[row][c] === num) {
-                        return false;
-                    }
+                const { size, subgridRows, subgridCols } = currentDifficultySettings;
+                if (isNaN(num) || num < 1 || num > size) return false;
+
+                for (let c = 0; c < size; c++) {
+                    if (board[row][c] === num) return false;
+                }
+                for (let r = 0; r < size; r++) {
+                    if (board[r][col] === num) return false;
                 }
 
-                // 检查列
-                for (let r = 0; r < N; r++) {
-                    if (board[r][col] === num) {
-                        return false;
-                    }
-                }
-
-                // 检查 3x3 子网格
-                const startRow = row - (row % 3);
-                const startCol = col - (col % 3);
-                for (let r = 0; r < 3; r++) {
-                    for (let c = 0; c < 3; c++) {
-                        if (board[startRow + r][startCol + c] === num) {
-                            return false;
-                        }
+                const startRow = row - (row % subgridRows);
+                const startCol = col - (col % subgridCols);
+                for (let r = 0; r < subgridRows; r++) {
+                    for (let c = 0; c < subgridCols; c++) {
+                        if (board[startRow + r][startCol + c] === num) return false;
                     }
                 }
                 return true;
             }
 
             function provideHint() {
-                const board = getBoardState(); 
-                messageElement.textContent = ''; 
+                const board = getBoardState();
+                messageElement.textContent = '';
+                const { size } = currentDifficultySettings;
 
                 let emptyCell = null;
-                // 找到第一个空格子
-                for (let r = 0; r < N; r++) {
-                    for (let c = 0; c < N; c++) {
-                        if (board[r][c] === 0 || isNaN(board[r][c])) { // Consider NaN as empty for hint purposes
+                for (let r = 0; r < size; r++) {
+                    for (let c = 0; c < size; c++) {
+                        if (board[r][c] === 0 || isNaN(board[r][c])) {
                             emptyCell = { row: r, col: c };
                             break;
                         }
@@ -215,9 +253,7 @@
                     return;
                 }
 
-                // 尝试为找到的空格填入 1-9 中的一个有效数字
-                // 为了提供一个“好”的提示，我们可以随机打乱数字顺序
-                let numbersToTry = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+                let numbersToTry = Array.from({ length: size }, (_, i) => i + 1);
                 for (let i = numbersToTry.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [numbersToTry[i], numbersToTry[j]] = [numbersToTry[j], numbersToTry[i]];
@@ -228,32 +264,28 @@
                         const cellInput = boardElement.querySelector(`.sudoku-cell[data-row='${emptyCell.row}'][data-col='${emptyCell.col}']`);
                         if (cellInput) {
                             cellInput.value = num;
-                            cellInput.style.backgroundColor = '#d4edda'; // 淡绿色
-                            
-                            // Remove highlight after a delay, only if not focused
+                            cellInput.style.backgroundColor = '#d4edda';
                             setTimeout(() => {
                                 if (document.activeElement !== cellInput) {
                                     cellInput.style.backgroundColor = '';
                                 }
                             }, 2000);
-
                             messageElement.textContent = `提示：已在第 ${emptyCell.row + 1} 行，第 ${emptyCell.col + 1} 列填入数字 ${num}。`;
                             messageElement.style.color = 'purple';
-                            return; 
+                            return;
                         }
                     }
                 }
-
-                messageElement.textContent = '无法为当前空格找到有效提示（可能是棋盘已存在冲突或无解）。';
+                messageElement.textContent = `无法为当前空格找到有效提示（可能是棋盘已存在冲突或无解）。`;
                 messageElement.style.color = 'orange';
             }
 
             function checkSolution() {
-                const board = getBoardState(); 
-                messageElement.textContent = ''; 
+                const board = getBoardState();
+                messageElement.textContent = '';
+                const { size, subgridRows, subgridCols } = currentDifficultySettings;
 
-                // 检查行
-                for (let i = 0; i < N; i++) {
+                for (let i = 0; i < size; i++) {
                     if (!isValidSet(board[i])) {
                         messageElement.textContent = `错误：第 ${i + 1} 行有重复或无效数字。`;
                         messageElement.style.color = 'red';
@@ -261,10 +293,9 @@
                     }
                 }
 
-                // 检查列
-                for (let j = 0; j < N; j++) {
+                for (let j = 0; j < size; j++) {
                     const column = [];
-                    for (let i = 0; i < N; i++) {
+                    for (let i = 0; i < size; i++) {
                         column.push(board[i][j]);
                     }
                     if (!isValidSet(column)) {
@@ -273,28 +304,29 @@
                         return false;
                     }
                 }
+                
+                const numSubgridBlocksPerRow = size / subgridCols;
+                for (let blockIdx = 0; blockIdx < size; blockIdx++) {
+                    const subgrid = [];
+                    const startBlockRow = Math.floor(blockIdx / numSubgridBlocksPerRow) * subgridRows;
+                    const startBlockCol = (blockIdx % numSubgridBlocksPerRow) * subgridCols;
 
-                // 检查 3x3 子网格
-                for (let blockRow = 0; blockRow < 3; blockRow++) {
-                    for (let blockCol = 0; blockCol < 3; blockCol++) {
-                        const subgrid = [];
-                        for (let i = 0; i < 3; i++) {
-                            for (let j = 0; j < 3; j++) {
-                                subgrid.push(board[blockRow * 3 + i][blockCol * 3 + j]);
-                            }
+                    for (let i = 0; i < subgridRows; i++) {
+                        for (let j = 0; j < subgridCols; j++) {
+                            subgrid.push(board[startBlockRow + i][startBlockCol + j]);
                         }
-                        if (!isValidSet(subgrid)) {
-                            messageElement.textContent = `错误：位于第 ${blockRow + 1} 行块，第 ${blockCol + 1} 列块的 3x3 子网格有重复或无效数字。`;
-                            messageElement.style.color = 'red';
-                            return false;
-                        }
+                    }
+                    if (!isValidSet(subgrid)) {
+                         messageElement.textContent = `错误：某个 ${subgridRows}x${subgridCols} 子网格有重复或无效数字。`;
+                        messageElement.style.color = 'red';
+                        return false;
                     }
                 }
                 
                 let isFilled = true;
-                for (let i = 0; i < N; i++) {
-                    for (let j = 0; j < N; j++) {
-                        if (board[i][j] === 0 || isNaN(board[i][j])) { 
+                for (let i = 0; i < size; i++) {
+                    for (let j = 0; j < size; j++) {
+                        if (board[i][j] === 0 || isNaN(board[i][j])) {
                             isFilled = false;
                             break;
                         }
@@ -311,10 +343,19 @@
                 }
                 return true;
             }
+            
+            startGameButton.addEventListener('click', () => {
+                currentDifficultySettings = difficulties[difficultySelect.value];
+                generateBoard();
+            });
 
-            generateBoard();
             checkButton.addEventListener('click', checkSolution);
             hintButton.addEventListener('click', provideHint);
+
+            // Optionally, generate a board on page load with default difficulty
+            // currentDifficultySettings = difficulties[difficultySelect.value];
+            // generateBoard(); 
+            // Or leave it empty until user clicks "Start New Game"
         });
     </script>
 </body>
