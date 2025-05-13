@@ -45,7 +45,6 @@
             border: 3px solid black;
             margin-bottom: 20px;
             box-shadow: 0 0 10px rgba(0,0,0,0.2);
-            /* Prevent board from collapsing when empty */
             min-width: 100px; 
             min-height: 100px;
         }
@@ -58,11 +57,11 @@
             border: 1px solid #ccc;
             box-sizing: border-box;
             color: #007bff;
-            -moz-appearance: textfield;
+            -moz-appearance: textfield; /* Firefox */
         }
         .sudoku-cell::-webkit-outer-spin-button,
         .sudoku-cell::-webkit-inner-spin-button {
-            -webkit-appearance: none;
+            -webkit-appearance: none; /* Chrome, Safari, Edge, Opera */
             margin: 0;
         }
         .sudoku-cell:focus {
@@ -86,9 +85,9 @@
     <div class="controls">
         <label for="difficulty-select">选择难度:</label>
         <select id="difficulty-select">
-            <option value="4x4">4x4 - 简单</option>
+            <option value="4x4" selected>4x4 - 简单</option>
             <option value="6x6">6x6 - 中等</option>
-            <option value="9x9" selected>9x9 - 困难</option>
+            <option value="9x9">9x9 - 困难</option>
         </select>
         <button id="start-game-button">开始新游戏</button>
     </div>
@@ -112,14 +111,14 @@
 
             const difficulties = {
                 '4x4': { size: 4, subgridRows: 2, subgridCols: 2, name: '4x4 - 简单' },
-                '6x6': { size: 6, subgridRows: 2, subgridCols: 3, name: '6x6 - 中等' }, // 6x6 subgrids are 2 rows, 3 cols
+                '6x6': { size: 6, subgridRows: 2, subgridCols: 3, name: '6x6 - 中等' },
                 '9x9': { size: 9, subgridRows: 3, subgridCols: 3, name: '9x9 - 困难' }
             };
-            let currentDifficultySettings = difficulties['9x9']; // Default
+            let currentDifficultySettings = difficulties[difficultySelect.value]; // Initialize with selected value
 
             function generateBoard() {
-                boardElement.innerHTML = ''; // Clear previous board
-                messageElement.textContent = ''; // Clear message
+                boardElement.innerHTML = ''; 
+                messageElement.textContent = ''; 
                 const { size, subgridRows, subgridCols } = currentDifficultySettings;
 
                 boardElement.style.gridTemplateColumns = `repeat(${size}, 40px)`;
@@ -130,7 +129,8 @@
                         const cell = document.createElement('input');
                         cell.type = 'number';
                         cell.min = '1';
-                        cell.max = String(size); // Max input based on board size
+                        cell.max = String(size); 
+                        cell.maxLength = String(size).length; // Set maxLength
                         cell.classList.add('sudoku-cell');
                         cell.dataset.row = i;
                         cell.dataset.col = j;
@@ -143,24 +143,42 @@
                         }
                         
                         cell.addEventListener('input', function() {
-                            if (this.value.length > String(size).length) { // Max length based on max number
-                                this.value = this.value.slice(0, String(size).length);
+                            const currentSize = currentDifficultySettings.size;
+                            const maxLength = parseInt(this.maxLength);
+
+                            // Filter out non-digits (important for pasted content or browsers that are lenient with type="number")
+                            this.value = this.value.replace(/[^0-9]/g, '');
+
+                            // Enforce maxLength
+                            if (this.value.length > maxLength) {
+                                this.value = this.value.slice(0, maxLength);
                             }
-                            if (parseInt(this.value) > size) {
-                                this.value = String(size);
-                            }
-                            if (parseInt(this.value) < 1 && this.value !== '') {
-                                this.value = '1';
+
+                            if (this.value !== '') {
+                                const num = parseInt(this.value);
+                                // Check against actual min/max for the game logic (1 to currentSize)
+                                if (num === 0) { // '0' is not allowed in Sudoku
+                                    this.value = '';
+                                } else if (num > currentSize) {
+                                    this.value = String(currentSize); // Cap at current board size
+                                }
+                                // The min="1" attribute on the input field should handle num < 1 for direct typing.
+                                // This JavaScript handles cases like '0' being typed or pasted, or values exceeding currentSize.
                             }
                         });
                         
                         cell.addEventListener('focus', function() {
-                            if (this.style.backgroundColor === 'rgb(212, 237, 218)' || this.style.backgroundColor === 'rgb(255, 221, 221)') {
+                            // Clear temporary hint/error backgrounds on focus
+                            if (this.style.backgroundColor === 'rgb(212, 237, 218)' /* hint green */ || 
+                                this.style.backgroundColor === 'rgb(255, 221, 221)' /* error red */) {
+                                this.style.backgroundColor = '#e6f7ff'; // Standard focus color
+                            } else {
                                 this.style.backgroundColor = '#e6f7ff';
                             }
                         });
                         cell.addEventListener('blur', function() {
-                             if (this.style.backgroundColor === 'rgb(222, 243, 255)') { 
+                             // Reset background if focus is lost and it was the standard focus color
+                             if (this.style.backgroundColor === 'rgb(222, 243, 255)') { // #e6f7ff
                                 this.style.backgroundColor = '';
                              }
                         });
@@ -184,10 +202,15 @@
                         const numVal = parseInt(val);
                         board[i][j] = val === '' ? 0 : numVal;
                         
+                        // Visual feedback for invalid numbers during check/hint
                         if (val !== '' && (isNaN(numVal) || numVal < 1 || numVal > size)) {
-                            cellInput.style.backgroundColor = '#ffdddd';
-                        } else if (cellInput.style.backgroundColor === 'rgb(255, 221, 221)') {
-                            cellInput.style.backgroundColor = '';
+                            if (document.activeElement !== cellInput) { // Don't change if focused
+                                cellInput.style.backgroundColor = '#ffdddd'; // Light red
+                            }
+                        } else if (cellInput.style.backgroundColor === 'rgb(255, 221, 221)') { // If it was red
+                             if (document.activeElement !== cellInput) {
+                                cellInput.style.backgroundColor = ''; // Reset background
+                             }
                         }
                     }
                 }
@@ -264,12 +287,14 @@
                         const cellInput = boardElement.querySelector(`.sudoku-cell[data-row='${emptyCell.row}'][data-col='${emptyCell.col}']`);
                         if (cellInput) {
                             cellInput.value = num;
-                            cellInput.style.backgroundColor = '#d4edda';
-                            setTimeout(() => {
-                                if (document.activeElement !== cellInput) {
-                                    cellInput.style.backgroundColor = '';
-                                }
-                            }, 2000);
+                            if (document.activeElement !== cellInput) {
+                                cellInput.style.backgroundColor = '#d4edda'; // Light green for hint
+                                setTimeout(() => {
+                                    if (document.activeElement !== cellInput && cellInput.style.backgroundColor === 'rgb(212, 237, 218)') {
+                                        cellInput.style.backgroundColor = '';
+                                    }
+                                }, 2000);
+                            }
                             messageElement.textContent = `提示：已在第 ${emptyCell.row + 1} 行，第 ${emptyCell.col + 1} 列填入数字 ${num}。`;
                             messageElement.style.color = 'purple';
                             return;
@@ -352,10 +377,8 @@
             checkButton.addEventListener('click', checkSolution);
             hintButton.addEventListener('click', provideHint);
 
-            // Optionally, generate a board on page load with default difficulty
-            // currentDifficultySettings = difficulties[difficultySelect.value];
-            // generateBoard(); 
-            // Or leave it empty until user clicks "Start New Game"
+            // Generate board on page load with default (selected) difficulty
+            generateBoard(); 
         });
     </script>
 </body>
