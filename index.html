@@ -3,228 +3,218 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>成语接龙小游戏</title>
+    <title>数独游戏</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
+            margin-top: 20px;
             background-color: #f0f0f0;
-            color: #333;
-        }
-        .container {
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            text-align: center;
-            width: 90%;
-            max-width: 500px;
         }
         h1 {
-            color: #4CAF50;
+            color: #333;
+        }
+        #sudoku-board {
+            display: grid;
+            grid-template-columns: repeat(9, 40px);
+            grid-template-rows: repeat(9, 40px);
+            border: 3px solid black;
             margin-bottom: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
         }
-        p {
-            font-size: 1.2em;
-            margin-bottom: 15px;
-        }
-        #current-idiom {
-            font-size: 1.5em;
+        .sudoku-cell {
+            width: 40px;
+            height: 40px;
+            text-align: center;
+            font-size: 20px;
             font-weight: bold;
-            color: #E91E63;
-            margin-bottom: 20px;
-            padding: 10px;
-            border: 2px solid #E91E63;
-            border-radius: 5px;
-            background-color: #fce4ec;
-        }
-        input[type="text"] {
-            padding: 10px;
-            font-size: 1em;
             border: 1px solid #ccc;
-            border-radius: 5px;
-            width: calc(100% - 22px); /* Adjust for padding and border */
-            margin-bottom: 15px;
+            box-sizing: border-box;
+            color: #007bff;
+            /* Remove spinners from number input */
+            -moz-appearance: textfield;
+        }
+        .sudoku-cell::-webkit-outer-spin-button,
+        .sudoku-cell::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .sudoku-cell:focus {
+            outline: none;
+            background-color: #e6f7ff;
         }
         button {
             padding: 10px 20px;
-            font-size: 1em;
-            color: #fff;
-            background-color: #4CAF50;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
             border: none;
             border-radius: 5px;
-            cursor: pointer;
             transition: background-color 0.3s ease;
         }
         button:hover {
-            background-color: #45a049;
+            background-color: #0056b3;
         }
         #message {
             margin-top: 15px;
-            font-size: 1em;
-            color: red;
-        }
-        #score {
-            margin-top: 20px;
-            font-size: 1.1em;
+            font-size: 18px;
             font-weight: bold;
-        }
-        .idiom-list-container {
-            margin-top: 20px;
-            text-align: left;
-            max-height: 150px;
-            overflow-y: auto;
-            border: 1px solid #eee;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        .idiom-list-container h3 {
-            margin-top: 0;
-            font-size: 1em;
-            color: #555;
-        }
-        .idiom-list-container ul {
-            list-style-type: none;
-            padding-left: 0;
-            font-size: 0.9em;
-        }
-        .idiom-list-container li {
-            padding: 2px 0;
+            min-height: 25px; /* Reserve space for message */
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>成语接龙</h1>
-        <p>上一个成语是：</p>
-        <div id="current-idiom">游戏尚未开始</div>
-        <input type="text" id="player-input" placeholder="请输入你的成语">
-        <button onclick="submitIdiom()">提交</button>
-        <button onclick="startGame()">重新开始</button>
-        <div id="message"></div>
-        <div id="score">得分: 0</div>
-
-        <div class="idiom-list-container">
-            <h3>可用成语列表 (部分示例):</h3>
-            <ul id="available-idioms-display">
-                <!-- 成语列表会在这里显示 -->
-            </ul>
-        </div>
-    </div>
+    <h1>数独游戏</h1>
+    <div id="sudoku-board"></div>
+    <button id="check-button">检查答案</button>
+    <p id="message"></p>
 
     <script>
-        // 预设的成语列表 (可以根据需要扩展)
-        const idioms = [
-            "一心一意", "意气风发", "发扬光大", "大公无私", "私心杂念", "念念不忘",
-            "忘恩负义", "义薄云天", "天长地久", "久负盛名", "名正言顺", "顺水推舟",
-            "舟车劳顿", "顿开茅塞", "塞翁失马", "马到成功", "功成名就", "就地取材",
-            "材大难用", "用武之地", "地大物博", "博大精深", "深思熟虑", "虑周藻密",
-            "密不透风", "风和日丽", "丽质天生", "生龙活虎", "虎虎生威", "威风凛凛",
-            "凛然正气", "气象万千", "千军万马", "马不停蹄", "蹄闲三寻", "寻根究底",
-            "底死谩生", "生生不息", "息事宁人", "人山人海", "海阔天空", "空前绝后",
-            "后起之秀", "秀外慧中", "中流砥柱", "柱石之坚"
-            // 你可以添加更多成语
-        ];
+        document.addEventListener('DOMContentLoaded', () => {
+            const boardElement = document.getElementById('sudoku-board');
+            const checkButton = document.getElementById('check-button');
+            const messageElement = document.getElementById('message');
+            const N = 9;
 
-        let currentIdiom = "";
-        let usedIdioms = new Set(); // 记录已使用过的成语
-        let score = 0;
+            function generateBoard() {
+                boardElement.innerHTML = ''; // Clear previous board if any
+                for (let i = 0; i < N; i++) {
+                    for (let j = 0; j < N; j++) {
+                        const cell = document.createElement('input');
+                        cell.type = 'number'; // Use number type for basic validation
+                        cell.min = '1';
+                        cell.max = '9';
+                        cell.classList.add('sudoku-cell');
+                        cell.dataset.row = i;
+                        cell.dataset.col = j;
 
-        const currentIdiomDiv = document.getElementById('current-idiom');
-        const playerInput = document.getElementById('player-input');
-        const messageDiv = document.getElementById('message');
-        const scoreDiv = document.getElementById('score');
-        const availableIdiomsDisplay = document.getElementById('available-idioms-display');
+                        // Add thicker borders for 3x3 subgrid divisions
+                        if ((i + 1) % 3 === 0 && i < N - 1) {
+                            cell.style.borderBottom = '2px solid black';
+                        }
+                        if ((j + 1) % 3 === 0 && j < N - 1) {
+                            cell.style.borderRight = '2px solid black';
+                        }
+                        
+                        // Prevent typing more than one digit
+                        cell.addEventListener('input', function() {
+                            if (this.value.length > 1) {
+                                this.value = this.value.slice(0, 1);
+                            }
+                        });
 
-        function displayAvailableIdioms() {
-            availableIdiomsDisplay.innerHTML = ''; // 清空列表
-            idioms.forEach(idiom => {
-                const li = document.createElement('li');
-                li.textContent = idiom;
-                availableIdiomsDisplay.appendChild(li);
-            });
-        }
-
-        function startGame() {
-            usedIdioms.clear();
-            score = 0;
-            updateScoreDisplay();
-            // 随机选择一个成语开始
-            const randomIndex = Math.floor(Math.random() * idioms.length);
-            currentIdiom = idioms[randomIndex];
-            usedIdioms.add(currentIdiom);
-            currentIdiomDiv.textContent = currentIdiom;
-            messageDiv.textContent = "";
-            playerInput.value = "";
-            playerInput.focus();
-        }
-
-        function submitIdiom() {
-            if (!currentIdiom || currentIdiom === "游戏尚未开始") {
-                messageDiv.textContent = "请先点击“重新开始”按钮开始游戏！";
-                return;
+                        boardElement.appendChild(cell);
+                    }
+                }
             }
 
-            const userInput = playerInput.value.trim();
-            if (userInput.length !== 4) {
-                messageDiv.textContent = "请输入一个四字成语！";
-                return;
+            function getBoardState() {
+                const board = [];
+                const cells = boardElement.querySelectorAll('.sudoku-cell');
+                let k = 0;
+                for (let i = 0; i < N; i++) {
+                    board[i] = [];
+                    for (let j = 0; j < N; j++) {
+                        const cellInput = cells[k++];
+                        const val = cellInput.value;
+                        board[i][j] = val === '' ? 0 : parseInt(val);
+                         // Visually mark invalid numbers (not 1-9) temporarily
+                        if (val !== '' && (isNaN(parseInt(val)) || parseInt(val) < 1 || parseInt(val) > 9)) {
+                            cellInput.style.backgroundColor = '#ffdddd'; // Light red for invalid entry
+                        } else {
+                            cellInput.style.backgroundColor = ''; // Reset background
+                        }
+                    }
+                }
+                return board;
             }
 
-            if (!idioms.includes(userInput)) {
-                messageDiv.textContent = `"${userInput}" 不是一个有效的成语，或者不在我们的词库中。`;
-                return;
+            function isValidSet(arr) {
+                const seen = new Set();
+                for (const num of arr) {
+                    if (num === 0) continue; // Ignore empty cells (0)
+                    if (isNaN(num) || num < 1 || num > 9) { // Check for NaN and out of range
+                        return false; 
+                    }
+                    if (seen.has(num)) {
+                        return false; // Duplicate
+                    }
+                    seen.add(num);
+                }
+                return true;
             }
 
-            if (usedIdioms.has(userInput)) {
-                messageDiv.textContent = `"${userInput}" 这个成语已经用过了！`;
-                return;
-            }
+            function checkSolution() {
+                const board = getBoardState(); // This also updates cell backgrounds for invalid entries
+                messageElement.textContent = ''; // Clear previous message
 
-            const lastCharOfCurrent = currentIdiom.slice(-1);
-            const firstCharOfInput = userInput.slice(0, 1);
-
-            if (lastCharOfCurrent === firstCharOfInput) {
-                currentIdiom = userInput;
-                usedIdioms.add(currentIdiom);
-                currentIdiomDiv.textContent = currentIdiom;
-                messageDiv.textContent = "接龙成功！";
-                playerInput.value = "";
-                score++;
-                updateScoreDisplay();
-
-                // 检查是否还有可接的成语
-                if (!findNextPossibleIdiom(currentIdiom)) {
-                    messageDiv.textContent = `太棒了！你成功接龙 "${currentIdiom}"，但似乎没有可以接的成语了。游戏结束！`;
-                    // 可以选择在这里禁用输入或显示游戏结束的明确信息
+                // Check rows
+                for (let i = 0; i < N; i++) {
+                    if (!isValidSet(board[i])) {
+                        messageElement.textContent = `错误：第 ${i + 1} 行有重复或无效数字。`;
+                        messageElement.style.color = 'red';
+                        return false;
+                    }
                 }
 
-            } else {
-                messageDiv.textContent = `"${userInput}" 的首字 "${firstCharOfInput}" 与 "${currentIdiom}" 的末字 "${lastCharOfCurrent}" 不匹配！`;
+                // Check columns
+                for (let j = 0; j < N; j++) {
+                    const column = [];
+                    for (let i = 0; i < N; i++) {
+                        column.push(board[i][j]);
+                    }
+                    if (!isValidSet(column)) {
+                        messageElement.textContent = `错误：第 ${j + 1} 列有重复或无效数字。`;
+                        messageElement.style.color = 'red';
+                        return false;
+                    }
+                }
+
+                // Check 3x3 subgrids
+                for (let blockRow = 0; blockRow < 3; blockRow++) {
+                    for (let blockCol = 0; blockCol < 3; blockCol++) {
+                        const subgrid = [];
+                        for (let i = 0; i < 3; i++) {
+                            for (let j = 0; j < 3; j++) {
+                                subgrid.push(board[blockRow * 3 + i][blockCol * 3 + j]);
+                            }
+                        }
+                        if (!isValidSet(subgrid)) {
+                            messageElement.textContent = `错误：位于第 ${blockRow + 1} 行块，第 ${blockCol + 1} 列块的 3x3 子网格有重复或无效数字。`;
+                            messageElement.style.color = 'red';
+                            return false;
+                        }
+                    }
+                }
+                
+                // Check if board is fully filled
+                let isFilled = true;
+                for (let i = 0; i < N; i++) {
+                    for (let j = 0; j < N; j++) {
+                        if (board[i][j] === 0 || isNaN(board[i][j])) { // Also check for NaN from invalid input
+                            isFilled = false;
+                            break;
+                        }
+                    }
+                    if (!isFilled) break;
+                }
+
+                if (isFilled) {
+                    messageElement.textContent = '恭喜！数独已正确完成！';
+                    messageElement.style.color = 'green';
+                } else {
+                    messageElement.textContent = '当前棋盘有效，但尚未完成。请继续填写。';
+                    messageElement.style.color = 'blue';
+                }
+                return true;
             }
-            playerInput.focus();
-        }
 
-        function findNextPossibleIdiom(current) {
-            const lastChar = current.slice(-1);
-            return idioms.find(idiom => !usedIdioms.has(idiom) && idiom.startsWith(lastChar));
-        }
-
-        function updateScoreDisplay() {
-            scoreDiv.textContent = `得分: ${score}`;
-        }
-
-        // 游戏加载时初始化
-        window.onload = () => {
-            displayAvailableIdioms(); // 显示可用成语列表
-            // startGame(); // 可以选择页面加载时自动开始游戏，或者让用户点击按钮开始
-            currentIdiomDiv.textContent = "点击“重新开始”按钮开始游戏";
-        };
+            generateBoard();
+            checkButton.addEventListener('click', checkSolution);
+        });
     </script>
 </body>
 </html>
